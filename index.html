@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover" />
+<meta name="theme-color" content="#0b1020" />
+<title>鹈鹕海岸捕鱼记 · Pelican Coastal Ride</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Ccircle cx='32' cy='34' r='22' fill='%23f7fbff'/%3E%3Cellipse cx='32' cy='18' rx='13' ry='11' fill='%23f7fbff'/%3E%3Cpath d='M42 16 L60 20 L42 24 Z' fill='%23f5a84a'/%3E%3Cpath d='M24 12 a13 13 0 0 1 18 -6 l-4 8 z' fill='%2319c3b1'/%3E%3Ccircle cx='30' cy='16' r='4' fill='%230a0d14'/%3E%3C/svg%3E" />
+<style>
+  :root{
+    --ink:#f2f7ff; --dim:#9fb2cc; --panel:rgba(10,16,32,.62); --line:rgba(255,255,255,.14);
+    --acc:#ffb347; --acc2:#5ad2ff; --ok:#67e08a;
+    --safe-t:env(safe-area-inset-top,0px); --safe-b:env(safe-area-inset-bottom,0px);
+    --safe-l:env(safe-area-inset-left,0px); --safe-r:env(safe-area-inset-right,0px);
+  }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  html,body{margin:0;height:100%;overflow:hidden;background:#05070f;color:var(--ink);
+    font-family:"PingFang SC","Hiragino Sans GB","Microsoft YaHei",system-ui,-apple-system,"Segoe UI",sans-serif;}
+  canvas{display:block}
+  #app{position:fixed;inset:0}
+  .hud{position:fixed;z-index:10;pointer-events:none;user-select:none}
+  .panel{background:var(--panel);border:1px solid var(--line);border-radius:14px;
+    backdrop-filter:blur(14px) saturate(1.4);-webkit-backdrop-filter:blur(14px) saturate(1.4);
+    box-shadow:0 10px 40px rgba(0,0,0,.35)}
+  /* ── 左上 HUD ── */
+  #hudTL{top:calc(12px + var(--safe-t));left:calc(12px + var(--safe-l));padding:12px 14px;min-width:212px}
+  .row{display:flex;align-items:baseline;justify-content:space-between;gap:14px;margin:3px 0}
+  .row .k{font-size:11px;color:var(--dim);letter-spacing:.08em}
+  .row .v{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums}
+  .big{font-size:34px;line-height:1;font-weight:800;font-variant-numeric:tabular-nums;
+    background:linear-gradient(180deg,#fff,#9ec9ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .unit{font-size:12px;color:var(--dim);font-weight:600;margin-left:3px}
+  #phase{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--acc)}
+  #phaseDot{width:9px;height:9px;border-radius:50%;background:var(--acc);box-shadow:0 0 10px var(--acc)}
+  .bar{height:5px;border-radius:99px;background:rgba(255,255,255,.12);overflow:hidden;margin-top:5px}
+  .bar>i{display:block;height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,var(--acc2),var(--acc));transition:width .12s}
+  /* ── 右上 成就 ── */
+  #hudTR{top:calc(12px + var(--safe-t));right:calc(12px + var(--safe-r));display:flex;gap:8px;align-items:flex-start}
+  .btn{pointer-events:auto;cursor:pointer;border:1px solid var(--line);background:var(--panel);color:var(--ink);
+    border-radius:12px;padding:9px 13px;font-size:12.5px;font-weight:600;letter-spacing:.03em;
+    backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);transition:.18s;white-space:nowrap}
+  .btn:hover{border-color:rgba(255,255,255,.34);transform:translateY(-1px)}
+  .btn:active{transform:translateY(0) scale(.97)}
+  .btn.on{border-color:var(--acc);color:var(--acc)}
+  /* ── 成就面板 ── */
+  #achPanel{position:fixed;z-index:20;top:calc(58px + var(--safe-t));right:calc(12px + var(--safe-r));
+    width:min(92vw,346px);max-height:72vh;overflow:auto;padding:14px;display:none}
+  #achPanel.open{display:block;animation:pop .22s ease}
+  @keyframes pop{from{opacity:0;transform:translateY(-8px) scale(.98)}to{opacity:1;transform:none}}
+  #achPanel h3{margin:0 0 4px;font-size:14px}
+  #achPanel .sub{font-size:11px;color:var(--dim);margin-bottom:10px}
+  .ach{display:flex;gap:10px;align-items:center;padding:8px;border-radius:10px;margin:5px 0;
+    background:rgba(255,255,255,.04);border:1px solid transparent}
+  .ach.done{background:rgba(103,224,138,.12);border-color:rgba(103,224,138,.34)}
+  .ach .ic{width:30px;height:30px;flex:0 0 30px;display:grid;place-items:center;border-radius:9px;
+    background:rgba(255,255,255,.08);font-size:15px}
+  .ach.done .ic{background:rgba(103,224,138,.2)}
+  .ach .t{font-size:12.5px;font-weight:700}
+  .ach .d{font-size:10.5px;color:var(--dim);margin-top:1px}
+  .ach.lock{opacity:.45}
+  /* ── 底部提示条 ── */
+  #hudB{bottom:calc(12px + var(--safe-b));left:50%;transform:translateX(-50%);
+    display:flex;gap:7px;padding:8px;flex-wrap:wrap;justify-content:center;max-width:94vw}
+  #hudB .btn{padding:8px 11px;font-size:11.5px}
+  #autoTag{margin:0 4px;display:none;align-items:center;gap:6px;font-size:11.5px;color:var(--ok);font-weight:700}
+  #autoTag.on{display:inline-flex}
+  #autoTag i{width:7px;height:7px;border-radius:50%;background:var(--ok);animation:blink 1.1s infinite}
+  @keyframes blink{50%{opacity:.2}}
+  /* ── toast ── */
+  #toasts{position:fixed;z-index:30;top:calc(14px + var(--safe-t));left:50%;transform:translateX(-50%);
+    display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+  .toast{display:flex;gap:10px;align-items:center;padding:10px 16px;border-radius:14px;
+    background:linear-gradient(135deg,rgba(255,179,71,.95),rgba(255,120,60,.92));color:#2a1500;
+    box-shadow:0 12px 34px rgba(255,140,60,.35);animation:tin .38s cubic-bezier(.2,1.2,.3,1)}
+  .toast .ic{font-size:22px}
+  .toast .t{font-weight:800;font-size:13.5px}
+  .toast .d{font-size:11px;opacity:.8}
+  @keyframes tin{from{opacity:0;transform:translateY(-16px) scale(.9)}to{opacity:1;transform:none}}
+  .toast.out{animation:tout .4s forwards}
+  @keyframes tout{to{opacity:0;transform:translateY(-14px) scale(.94)}}
+  /* ── 触屏 ── */
+  #touch{position:fixed;z-index:15;left:0;right:0;bottom:calc(74px + var(--safe-b));display:none;
+    justify-content:space-between;padding:0 16px;pointer-events:none}
+  #touch.on{display:flex}
+  .tgrp{display:flex;gap:9px;align-items:flex-end}
+  .tbtn{pointer-events:auto;width:62px;height:62px;border-radius:50%;border:1px solid var(--line);
+    background:rgba(12,18,34,.55);color:var(--ink);font-size:20px;font-weight:800;
+    backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:grid;place-items:center;
+    box-shadow:0 8px 24px rgba(0,0,0,.3);touch-action:none}
+  .tbtn.sm{width:50px;height:50px;font-size:14px}
+  .tbtn.hit{background:rgba(255,179,71,.85);color:#2a1500;border-color:#ffd9a0}
+  /* ── 开始页 ── */
+  #start{position:fixed;inset:0;z-index:50;display:grid;place-items:center;
+    background:radial-gradient(120% 90% at 50% 10%,#1d2b52 0%,#0a1022 45%,#05070f 100%)}
+  #start.hide{opacity:0;pointer-events:none;transition:opacity .7s}
+  .card{width:min(92vw,520px);padding:30px 28px;text-align:center}
+  .card h1{margin:0 0 4px;font-size:31px;letter-spacing:.02em;
+    background:linear-gradient(100deg,#ffd9a0,#ffb347 40%,#5ad2ff);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .card h2{margin:0 0 18px;font-size:12.5px;font-weight:500;color:var(--dim);letter-spacing:.24em}
+  .card p{font-size:13px;color:#c6d6ea;line-height:1.75;margin:0 0 18px}
+  .keys{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:8px;margin:0 0 20px}
+  .keys div{font-size:11.5px;color:var(--dim);background:rgba(255,255,255,.05);border:1px solid var(--line);
+    border-radius:10px;padding:8px 6px}
+  .keys b{display:inline-block;min-width:20px;color:var(--ink);font-weight:800;margin-right:4px}
+  #goBtn{pointer-events:auto;font-size:15px;padding:13px 34px;border-radius:14px;border:none;font-weight:800;
+    background:linear-gradient(135deg,#ffb347,#ff7a45);color:#2a1200;cursor:pointer;box-shadow:0 12px 30px rgba(255,140,60,.34)}
+  #goBtn:active{transform:scale(.97)}
+  #loadNote{margin-top:14px;font-size:11px;color:var(--dim)}
+  #fps{position:fixed;z-index:10;bottom:calc(12px + var(--safe-b));right:calc(12px + var(--safe-r));
+    font-size:10.5px;color:var(--dim);font-variant-numeric:tabular-nums;background:var(--panel);
+    border:1px solid var(--line);border-radius:9px;padding:4px 8px;pointer-events:none}
+  @media (max-width:760px){
+    #touch{bottom:calc(118px + var(--safe-b))}
+    .tbtn{width:56px;height:56px;font-size:18px}
+    .tbtn.sm{width:46px;height:46px;font-size:13px}
+  }
+  @media (max-width:620px){
+    #hudTL{min-width:170px;padding:9px 11px}.big{font-size:27px}.row .v{font-size:14px}
+    #hudB{bottom:calc(8px + var(--safe-b));gap:5px;padding:6px}
+    #hudB .btn{padding:6px 8px;font-size:10.5px}
+    .card h1{font-size:25px}
+  }
+</style>
+</head>
+<body>
+<div id="app"></div>
+
+<!-- HUD -->
+<div id="hudTL" class="hud panel">
+  <div class="row"><span class="k">速度</span><span id="phase"><i id="phaseDot"></i><span id="phaseTxt">黄昏</span></span></div>
+  <div><span class="big" id="spd">0</span><span class="unit">km/h</span></div>
+  <div class="bar"><i id="spdBar"></i></div>
+  <div class="row"><span class="k">里程</span><span class="v" id="dist">0.00 km</span></div>
+  <div class="row"><span class="k">鱼获</span><span class="v" id="fish">0</span></div>
+  <div class="row"><span class="k">踏频</span><span class="v" id="cad">0 <span class="unit">rpm</span></span></div>
+  <div class="row"><span class="k">画质 / FPS</span><span class="v" id="q" style="font-size:13px">高 · 60</span></div>
+  <div id="autoTag"><i></i>自动驾驶中</div>
+</div>
+
+<div id="hudTR" class="hud">
+  <button class="btn" id="achBtn">成就 <span id="achCount">0/14</span></button>
+  <button class="btn" id="muteBtn">音效 开</button>
+</div>
+
+<div id="achPanel" class="panel">
+  <h3>成就一览</h3>
+  <div class="sub">共 14 项 · 进度自动保存于本机</div>
+  <div id="achList"></div>
+</div>
+
+<div id="hudB" class="hud panel">
+  <span id="autoTag2"></span>
+  <button class="btn" data-cam="0">追尾</button>
+  <button class="btn" data-cam="1">电影</button>
+  <button class="btn" data-cam="2">鹈鹕视角</button>
+  <button class="btn" data-cam="3">侧视</button>
+  <button class="btn" data-cam="4">航拍</button>
+  <button class="btn" id="resetBtn">↺ 重置</button>
+</div>
+
+<div id="toasts"></div>
+
+<div id="touch">
+  <div class="tgrp">
+    <button class="tbtn" data-k="left">◀</button>
+    <button class="tbtn" data-k="right">▶</button>
+  </div>
+  <div class="tgrp">
+    <button class="tbtn sm" data-k="wheelie">翅</button>
+    <button class="tbtn" data-k="jump">跳</button>
+    <button class="tbtn sm" data-k="brake">减</button>
+    <button class="tbtn" data-k="accel">加</button>
+  </div>
+</div>
+
+<div id="fps" class="hud">— fps</div>
+
+<!-- 开始页 -->
+<div id="start">
+  <div class="card panel">
+    <h1>鹈鹕海岸捕鱼记</h1>
+    <h2>PELICAN · COASTAL RIDE</h2>
+    <p>戴上头盔与墨镜，围着红围巾，在黄昏通往星夜的海滨公路上飞驰。<br/>
+       踩踏板、变道、跃起、展翅抬前轮 —— 把跃出海面的鱼一口叼住。</p>
+    <div class="keys">
+      <div><b>W</b>加速</div><div><b>S</b>刹车</div>
+      <div><b>A</b>向左变道</div><div><b>D</b>向右变道</div>
+      <div><b>空格</b>跳跃</div><div><b>T</b>展翅抬前轮</div>
+      <div><b>C</b>切换镜头</div><div><b>B</b>成就列表</div>
+    </div>
+    <button id="goBtn">开始骑行</button>
+    <div id="loadNote">程序化 3D 场景 · Web Audio 实时合成 · 首次点击后开启声音</div>
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "./vendor/three.module.js",
+    "three/addons/": "./vendor/addons/"
+  }
+}
+</script>
+<script type="module" src="./src/main.js"></script>
+</body>
+</html>
